@@ -463,3 +463,94 @@ cdef DTYPE_t c_levenshtein(
     ret_val = Array2D_0_get(d, len1, len2)
     Array2D_del(d)
     return ret_val
+
+
+def modified_lev(
+    unsigned char* str1,
+    unsigned char* str2,
+    DTYPE_t[::1] insert_costs=None,
+    DTYPE_t[::1] delete_costs=None,
+    DTYPE_t[:,::1] substitute_costs=None):
+    """
+    Calculates the Levenshtein distance between str1 and str2,
+    provided the costs of inserting, deleting, and substituting characters.
+    The costs default to 1 if not provided.
+
+    For convenience, this function is aliased as clev.lev().
+
+    :param str str1: first string
+    :param str str2: second string
+    :param np.ndarray insert_costs: a numpy array of np.float64 (C doubles) of length 128 (0..127),
+        where insert_costs[i] is the cost of inserting ASCII character i
+    :param np.ndarray delete_costs: a numpy array of np.float64 (C doubles) of length 128 (0..127),
+        where delete_costs[i] is the cost of deleting ASCII character i
+    :param np.ndarray substitute_costs: a 2D numpy array of np.float64 (C doubles) of dimensions (128, 128),
+        where substitute_costs[i, j] is the cost of substituting ASCII character i with
+        ASCII character j
+
+    """
+    if insert_costs is None:
+        insert_costs = unit_array
+    if delete_costs is None:
+        delete_costs = unit_array
+    if substitute_costs is None:
+        substitute_costs = unit_matrix
+
+    s1 = str(str1).encode()
+    s2 = str(str2).encode()  
+
+    return c_modified_lev(
+        s1, len(s1),
+        s2, len(s2),
+        len(s2),
+        insert_costs,
+        delete_costs,
+        substitute_costs
+    )
+
+mod_lev = modified_lev
+
+
+cdef DTYPE_t c_modified_lev(
+    unsigned char* str1, Py_ssize_t len1,
+    unsigned char* str2, Py_ssize_t len2,
+    DTYPE_t start_min_dist,
+    DTYPE_t[::1] insert_costs,
+    DTYPE_t[::1] delete_costs,
+    DTYPE_t[:,::1] substitute_costs) nogil:
+    """
+    https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm
+    """
+    cdef:
+        Py_ssize_t i, j
+        unsigned char char_i, char_j
+        DTYPE_t min_dist, dist
+        Array2D d
+
+    Array2D_init(&d, len1 + 1, len2 + 1)
+
+    min_dist = start_min_dist
+
+    for i in range(0, len1 + 1):
+        Array2D_0_at(d, i, 0)[0] = 0
+    for j in range(1, len2 + 1):
+        Array2D_0_at(d, 0, j)[0] = j
+
+    for i in range(1, len1 + 1):
+        char_i = str_1_get(str1, i)
+        for j in range(1, len2 + 1):
+            char_j = str_1_get(str2, j)
+            if char_i == char_j:  # match
+                dist = Array2D_0_get(d, i - 1, j - 1)
+            else:
+                dist = min(
+                    Array2D_0_get(d, i - 1, j) + delete_costs[char_i],
+                    Array2D_0_get(d, i, j - 1) + insert_costs[char_j],
+                    Array2D_0_get(d, i - 1, j - 1) + substitute_costs[char_i, char_j]
+                )
+            Array2D_0_at(d, i, j)[0] = dist
+            if j == len2:
+                min_dist = min(min_dist, dist)
+
+    Array2D_del(d)
+    return min_dist
