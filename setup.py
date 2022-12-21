@@ -7,14 +7,14 @@ with open('README.rst') as readme:
 
 
 setup(
-    name='weighted_levenshtein',
-    version='0.2.1',
+    name='weighted_levenshtein-substring',
+    version='0.0.3',
     description=(
         'Library providing functions to calculate Levenshtein distance, Optimal String Alignment distance, '
         'and Damerau-Levenshtein distance, where the cost of each operation can be weighted by letter.'
     ),
     long_description=long_description,
-    url='https://github.com/infoscout/weighted-levenshtein',
+    url='https://github.com/IsaacRe/weighed-levenshtein-substring',
     author='David Su (InfoScout)',
     author_email='david.su@infoscoutinc.com',
     license='MIT',
